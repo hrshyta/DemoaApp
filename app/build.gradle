@@ -10,6 +10,7 @@ android {
         versionName "1.0"
         multiDexEnabled true
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        useLibrary 'org.apache.http.legacy'
     }
     buildTypes {
         release {
@@ -30,6 +31,8 @@ dependencies
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+            implementation 'org.apache.httpcomponents:httpcore:4.4.1'
+           // implementation 'org.apache.httpcomponents:httpclient:4.5'
 
 
 }

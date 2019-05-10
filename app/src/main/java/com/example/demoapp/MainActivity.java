@@ -22,6 +22,7 @@ import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,12 +32,26 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
 import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLEncoder;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, com.google.android.gms.location.LocationListener {
     private static final String TAG = "DemoAppMain";
@@ -52,9 +67,30 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     public static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
     public static final String SECURE_SETTINGS_BLUETOOTH_ADDRESS = "bluetooth_address";
     private TextView mgetLocation;
+    String edit_text_data;
+    EditText your_edit_text;
+
+    HttpClient httpclient;
+    HttpGet httpget;
+    HttpResponse httpresponse;
+    HttpResponse hhttpresponse;
+    JSONObject myJsonObject = null;
+    JSONArray myJsonArray = null;
+    String myJsonString = "";
+
+    JSONObject nmyJsonObject = null;
+    JSONArray nmyJsonArray = null;
+    String nmyJsonString = "";
+
+    InputStream is;
+    InputStreamReader isr;
+    BufferedReader br;
+    StringBuilder sb;
+
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState)
+    {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         registerReceiver(receiver, new IntentFilter(BluetoothDevice.ACTION_FOUND));
@@ -63,6 +99,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         mStart = (Button) findViewById(R.id.Start);
         mStop = (Button) findViewById(R.id.Stop);
         mgetIMEIID = (TextView) findViewById(R.id.text_view_IMEI);
+        your_edit_text = (EditText) findViewById(R.id.your_id);
 
         /*mGoogleApiClient = new GoogleApiClient.Builder(getApplicationContext())
                 .addConnectionCallbacks(this)
@@ -74,7 +111,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         {
             @Override
             public void onClick(View v) {
-
+                edit_text_data = your_edit_text.getText().toString();
+                new BussinessOwnerHttpAsyncTask().execute();
                 String[] mimei1;
                 mimei1 = getIMEIID();
                 mgetIMEIID.setText("IMEI Number:: " + mimei1[0] + "\n IMSI of Sim:: " + mimei1[1]);
@@ -93,7 +131,70 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
 
     }
+    class BussinessOwnerHttpAsyncTask extends AsyncTask<String, Void, String>
+    {
+        @Override
+        protected void onPreExecute()
+        {
+            // TODO Auto-generated method stub
+            super.onPreExecute();
+        }
 
+        @Override
+        protected String doInBackground(String... params) {
+            HttpClient httpclient = new DefaultHttpClient();
+            String myUrl = "www.google.com/q=" + edit_text_data;
+            String encodedURL = "";
+            try {
+                encodedURL = URLEncoder.encode(myUrl, "UTF-8");
+            } catch (UnsupportedEncodingException e1) {
+                // TODO Auto-generated catch block
+                e1.printStackTrace();
+            }
+
+            try {
+                URL url = new URL(encodedURL);
+                Log.d("asca", "" + url);
+            } catch (MalformedURLException e1) {
+                // TODO Auto-generated catch block
+                e1.printStackTrace();
+            }
+
+            HttpGet httpget = new HttpGet(encodedURL);
+
+            try
+            {
+                httpresponse = httpclient.execute(httpget);
+                System.out.println("httpresponse" + httpresponse);
+                Log.i("response", "Response" + httpresponse);
+                InputStream is = httpresponse.getEntity().getContent();
+                InputStreamReader isr = new InputStreamReader(is);
+                BufferedReader br = new BufferedReader(isr);
+                StringBuilder sb = new StringBuilder();
+
+                String recievingDataFromServer = null;
+                while ((recievingDataFromServer = br.readLine()) != null)
+                {
+                    Log.i("CHECK WHILE", "CHECK WHILE");
+                    sb.append(recievingDataFromServer);
+                }
+
+                myJsonString = sb.toString();
+            }
+            catch (ClientProtocolException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            catch (IOException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            return sb.toString();
+
+        }
+    }
     private String[] getIMEIID() {
         String[] mimei = new String[5];
         TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
@@ -107,7 +208,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         return mimei;
     }
 
-    private final BroadcastReceiver receiver = new BroadcastReceiver() {
+    private final BroadcastReceiver receiver = new BroadcastReceiver()
+    {
         @Override
         public void onReceive(Context context, Intent intent) {
 
@@ -224,6 +326,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     }
 
+    @Override
+    protected void onDestroy()
+    {
+        unregisterReceiver(receiver);
+        super.onDestroy();
+    }
 }
 
 

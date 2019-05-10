@@ -14,13 +14,13 @@
         android:gravity="center"
         android:text="Start"/>
 
- <!--  <EditText
-        android:id="@+id/editText"
+ <EditText
+        android:id="@+id/your_id"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:ems="10"
         android:inputType="textUri"
-        />-->
+        />
 
     <Button
         android:id="@+id/Stop"
