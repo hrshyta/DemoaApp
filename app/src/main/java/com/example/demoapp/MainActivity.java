@@ -11,6 +11,7 @@ import android.content.pm.PackageManager;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
@@ -20,7 +21,10 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -40,6 +44,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -49,7 +54,9 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.util.ByteArrayBuffer;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -69,7 +76,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private TextView mgetLocation;
     String edit_text_data;
     EditText your_edit_text;
-
+    int rssi;
+    String name;
     HttpClient httpclient;
     HttpGet httpget;
     HttpResponse httpresponse;
@@ -85,6 +93,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     InputStream is;
     InputStreamReader isr;
     BufferedReader br;
+    BufferedOutputStream out;
+    OutputStream os;
     StringBuilder sb;
 
 
@@ -99,29 +109,29 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         mStart = (Button) findViewById(R.id.Start);
         mStop = (Button) findViewById(R.id.Stop);
         mgetIMEIID = (TextView) findViewById(R.id.text_view_IMEI);
-        your_edit_text = (EditText) findViewById(R.id.your_id);
+        your_edit_text =(EditText)findViewById(R.id.your_id);
 
-        /*mGoogleApiClient = new GoogleApiClient.Builder(getApplicationContext())
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .addApi(LocationServices.API)
-                .build();*/
-        buildGoogleApiClient();
+
+
         mStart.setOnClickListener(new View.OnClickListener()
         {
             @Override
             public void onClick(View v) {
                 edit_text_data = your_edit_text.getText().toString();
-                new BussinessOwnerHttpAsyncTask().execute();
-                String[] mimei1;
-                mimei1 = getIMEIID();
-                mgetIMEIID.setText("IMEI Number:: " + mimei1[0] + "\n IMSI of Sim:: " + mimei1[1]);
-                BTAdapter.startDiscovery();
 
+                if (edit_text_data.matches("")) {
+                    Log.d(TAG, "Enter URL");
 
+                } else {
+                    Log.d(TAG, "Lost Focus");
+                    BTAdapter.startDiscovery();
+                    String[] mimei1;
+                    mimei1 = getIMEIID();
+                    mgetIMEIID.setText("IMEI Number:: " + mimei1[0] + "\n IMSI of Sim:: " + mimei1[1]);
+                    new BussinessOwnerHttpAsyncTask().execute();
+                }
             }
-        });
-
+            });
         mStop.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -131,68 +141,22 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
 
     }
-    class BussinessOwnerHttpAsyncTask extends AsyncTask<String, Void, String>
-    {
+    class BussinessOwnerHttpAsyncTask extends AsyncTask<String, Void, String> {
+
         @Override
-        protected void onPreExecute()
-        {
+        protected void onPreExecute() {
             // TODO Auto-generated method stub
             super.onPreExecute();
         }
 
         @Override
-        protected String doInBackground(String... params) {
-            HttpClient httpclient = new DefaultHttpClient();
-            String myUrl = "www.google.com/q=" + edit_text_data;
-            String encodedURL = "";
-            try {
-                encodedURL = URLEncoder.encode(myUrl, "UTF-8");
-            } catch (UnsupportedEncodingException e1) {
-                // TODO Auto-generated catch block
-                e1.printStackTrace();
-            }
+        protected String doInBackground(String... params)
+        {
 
-            try {
-                URL url = new URL(encodedURL);
-                Log.d("asca", "" + url);
-            } catch (MalformedURLException e1) {
-                // TODO Auto-generated catch block
-                e1.printStackTrace();
-            }
 
-            HttpGet httpget = new HttpGet(encodedURL);
-
-            try
-            {
-                httpresponse = httpclient.execute(httpget);
-                System.out.println("httpresponse" + httpresponse);
-                Log.i("response", "Response" + httpresponse);
-                InputStream is = httpresponse.getEntity().getContent();
-                InputStreamReader isr = new InputStreamReader(is);
-                BufferedReader br = new BufferedReader(isr);
-                StringBuilder sb = new StringBuilder();
-
-                String recievingDataFromServer = null;
-                while ((recievingDataFromServer = br.readLine()) != null)
-                {
-                    Log.i("CHECK WHILE", "CHECK WHILE");
-                    sb.append(recievingDataFromServer);
-                }
-
-                myJsonString = sb.toString();
-            }
-            catch (ClientProtocolException e)
-            {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-            catch (IOException e)
-            {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-            return sb.toString();
-
+            Log.d(TAG, "doInBackground: ");
+            buildGoogleApiClient();
+            return null;
         }
     }
     private String[] getIMEIID() {
@@ -206,8 +170,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         mimei[1] = telephonyManager.getSubscriberId();
 
         return mimei;
-    }
 
+    }
     private final BroadcastReceiver receiver = new BroadcastReceiver()
     {
         @Override
@@ -216,8 +180,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             String action = intent.getAction();
             if (BluetoothDevice.ACTION_FOUND.equals(action)) {
 
-                int rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE);
-                String name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
+               rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE);
+                name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
                 //String macAddress = Settings.Secure.getString(getContentResolver(), SECURE_SETTINGS_BLUETOOTH_ADDRESS);
                 //String id=BTAdapter.getAddress();
                 //String id=intent.getStringExtra(BluetoothDevice.ACTION_UUID);

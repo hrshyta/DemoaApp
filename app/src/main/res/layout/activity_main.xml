@@ -28,19 +28,33 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:text="Stop"/>
+
+    <TextView
+       android:text="2a.Location"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        />
     <TextView
         android:id="@+id/text_view_Location"
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
         />
 
-
+    <TextView
+        android:text="2b.IMEI"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        />
     <TextView
         android:id="@+id/text_view_IMEI"
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
          />
-
+    <TextView
+        android:text="2c.Bluetooth Device Names and Signals"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        />
     <TextView
         android:id="@+id/textView1"
         android:layout_height="wrap_content"
