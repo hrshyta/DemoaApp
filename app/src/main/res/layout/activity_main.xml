@@ -19,7 +19,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:ems="10"
-        android:inputType="textUri"
+     android:inputType="textUri"
+     android:imeOptions="actionDone"
         />
 
     <Button
@@ -62,7 +63,19 @@
         android:id="@+id/textView1"
         android:layout_height="wrap_content"
         android:layout_width="wrap_content"
+
         />
+    <ScrollView
+        android:id="@+id/SCROLLER_ID"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="vertical"
+        android:fillViewport="true">
 
-
+    <TextView
+        android:id="@+id/http_url_response_text_view"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        />
+    </ScrollView>
 </LinearLayout>

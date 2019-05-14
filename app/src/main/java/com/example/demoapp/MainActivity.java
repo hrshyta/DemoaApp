@@ -13,6 +13,9 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Message;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -27,6 +30,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,6 +39,7 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -63,14 +68,14 @@ import org.json.JSONObject;
 public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, com.google.android.gms.location.LocationListener {
     private static final String TAG = "DemoAppMain";
     private Button mStart, mStop;
-    private TextView mgetIMEIID;
+    private TextView mgetIMEIID, responseTextView;
     private BluetoothAdapter BTAdapter = BluetoothAdapter.getDefaultAdapter();
     private GoogleApiClient mGoogleApiClient;
     private Location mLocation;
     private LocationManager locationManager;
     private LocationRequest mLocationRequest;
     private com.google.android.gms.location.LocationListener listener;
-    public static final long UPDATE_INTERVAL_IN_MILLISECONDS =2* 1000;
+    public static final long UPDATE_INTERVAL_IN_MILLISECONDS = 2 * 1000;
     public static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
     public static final String SECURE_SETTINGS_BLUETOOTH_ADDRESS = "bluetooth_address";
     private TextView mgetLocation;
@@ -96,11 +101,19 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     BufferedOutputStream out;
     OutputStream os;
     StringBuilder sb;
-
+    private Handler uiUpdater = null;
+    boolean handled;
+    // Child thread sent message type value to activity main thread Handler.
+    private static final int REQUEST_CODE_SHOW_RESPONSE_TEXT = 1;
+    // The key of message stored server returned data.
+    private static final String KEY_RESPONSE_TEXT = "KEY_RESPONSE_TEXT";
+    ScrollView mScrollView;
+    TextView txtUser;
+    long timeBeforeThreadStart;
+    boolean isInputEventOccurred;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState)
-    {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         registerReceiver(receiver, new IntentFilter(BluetoothDevice.ACTION_FOUND));
@@ -109,38 +122,66 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         mStart = (Button) findViewById(R.id.Start);
         mStop = (Button) findViewById(R.id.Stop);
         mgetIMEIID = (TextView) findViewById(R.id.text_view_IMEI);
-        your_edit_text =(EditText)findViewById(R.id.your_id);
+        your_edit_text = (EditText) findViewById(R.id.your_id);
+        timeBeforeThreadStart = System.currentTimeMillis();
 
-
-
-        mStart.setOnClickListener(new View.OnClickListener()
-        {
+        mStart.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 edit_text_data = your_edit_text.getText().toString();
+                your_edit_text.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+                    @Override
+                    public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                        handled = false;
+                        if (actionId == EditorInfo.IME_ACTION_DONE) {
+                            // TODO do something
+                            handled = true;
+                            if(handled)
+                            {
+                                new BussinessOwnerHttpAsyncTask().execute();
+                                buildGoogleApiClient();
+                                BTAdapter.startDiscovery();
+                                String[] mimei1;
+                                mimei1 = getIMEIID();
+                                mgetIMEIID.setText("IMEI Number:: " + mimei1[0] + "\n IMSI of Sim:: " + mimei1[1]);
+                            }
+                          /*  Thread t = new Thread(new Runnable()
+                            {
+                                @Override
+                                public void run()
+                                {
+                                    // TODO Auto-generated method stub
+                                    if (handled)
+                                    {
+                                        // write code to close app
 
-                if (edit_text_data.matches("")) {
-                    Log.d(TAG, "Enter URL");
+                                    }
+                                   // SystemClock.sleep(30000);
+                                }
+                            });
+                            t.start();*/ 
+                        }
 
-                } else {
-                    Log.d(TAG, "Lost Focus");
-                    BTAdapter.startDiscovery();
-                    String[] mimei1;
-                    mimei1 = getIMEIID();
-                    mgetIMEIID.setText("IMEI Number:: " + mimei1[0] + "\n IMSI of Sim:: " + mimei1[1]);
-                    new BussinessOwnerHttpAsyncTask().execute();
-                }
+                        return handled;
+                    }
+                });
+
             }
-            });
+        });
         mStop.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
+                unregisterReceiver(receiver);
+                if (mGoogleApiClient.isConnected()) {
+                    mGoogleApiClient.disconnect();
+                }
             }
         });
 
 
     }
+
+
     class BussinessOwnerHttpAsyncTask extends AsyncTask<String, Void, String> {
 
         @Override
@@ -150,15 +191,67 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         }
 
         @Override
-        protected String doInBackground(String... params)
-        {
+        protected String doInBackground(String... params) {
+            String[] mimei1;
+            mimei1 = getIMEIID();
+            HttpURLConnection urlConnection = null;
+            String response = null;
+            edit_text_data = your_edit_text.getText().toString();
 
+            try {
+                URL url = new URL(edit_text_data);
+                urlConnection = (HttpURLConnection) url.openConnection();
+                out = new BufferedOutputStream(urlConnection.getOutputStream());
 
-            Log.d(TAG, "doInBackground: ");
-            buildGoogleApiClient();
-            return null;
+                BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, "UTF-8"));
+                writer.write(mimei1[0]);
+                writer.flush();
+                writer.close();
+                out.close();
+
+                urlConnection.connect();
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+
+            try {
+                InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+                StringBuilder result = new StringBuilder();
+                String line=mimei1[0];
+                while ((line = reader.readLine()) != null) {
+                    result.append(line);
+                }
+                response = result.toString();
+                Log.d("test", "result from server: " + result.toString());
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                if (urlConnection != null) {
+                    urlConnection.disconnect();
+                }
+            }
+            return response;
         }
+
+        @Override
+        protected void onPostExecute(String response) {
+            mScrollView = (ScrollView) findViewById(R.id.SCROLLER_ID);
+            txtUser = (TextView) findViewById(R.id.http_url_response_text_view);
+            txtUser.setText(response);
+        }
+
     }
+
+    private void scrollToBottom() {
+        mScrollView.post(new Runnable() {
+            public void run() {
+                mScrollView.smoothScrollTo(0, txtUser.getBottom());
+            }
+        });
+    }
+
     private String[] getIMEIID() {
         String[] mimei = new String[5];
         TelephonyManager telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
@@ -172,15 +265,15 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         return mimei;
 
     }
-    private final BroadcastReceiver receiver = new BroadcastReceiver()
-    {
+
+    private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
 
             String action = intent.getAction();
             if (BluetoothDevice.ACTION_FOUND.equals(action)) {
 
-               rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE);
+                rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE);
                 name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
                 //String macAddress = Settings.Secure.getString(getContentResolver(), SECURE_SETTINGS_BLUETOOTH_ADDRESS);
                 //String id=BTAdapter.getAddress();
@@ -190,9 +283,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             }
         }
     };
-    public synchronized void buildGoogleApiClient()
-    {
-        Log.d(TAG,"api client");
+
+    public synchronized void buildGoogleApiClient() {
+        Log.d(TAG, "api client");
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
@@ -212,25 +305,22 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             return;
         }
         startLocationUpdates();
-        Log.d(TAG,"onConnected");
+        Log.d(TAG, "onConnected");
         mLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-        if(mLocation == null)
-        {
+        if (mLocation == null) {
             startLocationUpdates();
         }
-        if (mLocation != null)
-        {
+        if (mLocation != null) {
             double latitude = mLocation.getLatitude();
             double longitude = mLocation.getLongitude();
-        }
-        else {
+        } else {
             // Toast.makeText(this, "Location not Detected", Toast.LENGTH_SHORT).show();
         }
     }
-    protected void startLocationUpdates()
-    {
+
+    protected void startLocationUpdates() {
         // Create the location request
-        Log.d(TAG,"start Location");
+        Log.d(TAG, "start Location");
         mLocationRequest = LocationRequest.create()
                 .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
                 .setInterval(UPDATE_INTERVAL_IN_MILLISECONDS)
@@ -261,6 +351,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
         Log.i(TAG, "Connection failed. Error: " + connectionResult.getErrorCode());
     }
+
     @Override
     public void onStart() {
         super.onStart();
@@ -272,13 +363,12 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     @Override
     public void onStop() {
         super.onStop();
-        if (mGoogleApiClient.isConnected()) {
-            mGoogleApiClient.disconnect();
-        }
+
     }
+
     @Override
-    public void onLocationChanged(Location location)
-    {
+    public void onLocationChanged(Location location) {
+
         //location.getLongitude();
         //location.getLatitude();
         String msg = "Updated Location: " +
@@ -293,7 +383,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     @Override
     protected void onDestroy()
     {
-        unregisterReceiver(receiver);
+
         super.onDestroy();
     }
 }
